@@ -10,11 +10,19 @@
 #include <string>
 #include <iostream>
 #include <memory>
+#include <numeric>
+#include <chrono>
+#include <iomanip>
+
+using std::chrono::high_resolution_clock;
+using std::chrono::duration_cast;
+using std::chrono::duration;
+using std::chrono::milliseconds;
 
 class SimpleCompute : public ICompute
 {
 public:
-  SimpleCompute(uint32_t a_length);
+  SimpleCompute(uint32_t a_length, std::vector<float> numbers);
   ~SimpleCompute()  { Cleanup(); };
 
   inline VkInstance   GetVkInstance() const override { return m_instance; }
@@ -63,7 +71,8 @@ private:
 
   std::shared_ptr<vk_utils::DescriptorMaker> m_pBindings = nullptr;
 
-  uint32_t m_length  = 16u;
+  uint32_t m_length = 16u;
+  std::vector<float> m_numbers;
   
   VkPhysicalDeviceFeatures m_enabledDeviceFeatures = {};
   std::vector<const char*> m_deviceExtensions      = {};
@@ -79,7 +88,7 @@ private:
   VkPipeline m_pipeline;
   VkPipelineLayout m_layout;
 
-  VkBuffer m_A, m_B, m_sum;
+  VkBuffer m_A, m_res;
  
   void CreateInstance();
   void CreateDevice(uint32_t a_deviceId);

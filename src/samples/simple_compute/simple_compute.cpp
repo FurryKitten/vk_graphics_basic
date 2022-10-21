@@ -4,7 +4,7 @@
 #include <vk_buffers.h>
 #include <vk_utils.h>
 
-SimpleCompute::SimpleCompute(uint32_t a_length) : m_length(a_length)
+SimpleCompute::SimpleCompute(uint32_t a_length, std::vector<float> numbers) : m_length(a_length), m_numbers(numbers)
 {
 #ifdef NDEBUG
   m_enableValidation = false;
@@ -79,31 +79,24 @@ void SimpleCompute::SetupSimplePipeline()
   // Создание и аллокация буферов
   m_A = vk_utils::createBuffer(m_device, sizeof(float) * m_length, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
                                                                        VK_BUFFER_USAGE_TRANSFER_DST_BIT);
-  m_B = vk_utils::createBuffer(m_device, sizeof(float) * m_length, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-                                                                       VK_BUFFER_USAGE_TRANSFER_DST_BIT);
-  m_sum = vk_utils::createBuffer(m_device, sizeof(float) * m_length, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+  m_res = vk_utils::createBuffer(m_device, sizeof(float) * m_length, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
                                                                        VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
-  vk_utils::allocateAndBindWithPadding(m_device, m_physicalDevice, {m_A, m_B, m_sum}, 0);
+  vk_utils::allocateAndBindWithPadding(m_device, m_physicalDevice, {m_A, m_res}, 0);
 
   m_pBindings = std::make_shared<vk_utils::DescriptorMaker>(m_device, dtypes, 1);
 
   // Создание descriptor set для передачи буферов в шейдер
   m_pBindings->BindBegin(VK_SHADER_STAGE_COMPUTE_BIT);
   m_pBindings->BindBuffer(0, m_A);
-  m_pBindings->BindBuffer(1, m_B);
-  m_pBindings->BindBuffer(2, m_sum);
+  m_pBindings->BindBuffer(1, m_res);
   m_pBindings->BindEnd(&m_sumDS, &m_sumDSLayout);
 
   // Заполнение буферов
-  std::vector<float> values(m_length);
+  /*std::vector<float> values(m_length);
   for (uint32_t i = 0; i < values.size(); ++i) {
     values[i] = (float)i;
-  }
-  m_pCopyHelper->UpdateBuffer(m_A, 0, values.data(), sizeof(float) * values.size());
-  for (uint32_t i = 0; i < values.size(); ++i) {
-    values[i] = (float)i * i;
-  }
-  m_pCopyHelper->UpdateBuffer(m_B, 0, values.data(), sizeof(float) * values.size());
+  }*/
+  m_pCopyHelper->UpdateBuffer(m_A, 0, m_numbers.data(), sizeof(float) * m_numbers.size());
 }
 
 void SimpleCompute::BuildCommandBufferSimple(VkCommandBuffer a_cmdBuff, VkPipeline)
@@ -122,7 +115,7 @@ void SimpleCompute::BuildCommandBufferSimple(VkCommandBuffer a_cmdBuff, VkPipeli
 
   vkCmdPushConstants(a_cmdBuff, m_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(m_length), &m_length);
 
-  vkCmdDispatch(a_cmdBuff, 1, 1, 1);
+  vkCmdDispatch(a_cmdBuff, m_length / 32, 1, 1);
 
   VK_CHECK_RESULT(vkEndCommandBuffer(a_cmdBuff));
 }
@@ -136,8 +129,7 @@ void SimpleCompute::CleanupPipeline()
   }
 
   vkDestroyBuffer(m_device, m_A, nullptr);
-  vkDestroyBuffer(m_device, m_B, nullptr);
-  vkDestroyBuffer(m_device, m_sum, nullptr);
+  vkDestroyBuffer(m_device, m_res, nullptr);
 
   vkDestroyPipelineLayout(m_device, m_layout, nullptr);
   vkDestroyPipeline(m_device, m_pipeline, nullptr);
@@ -217,15 +209,27 @@ void SimpleCompute::Execute()
   fenceCreateInfo.flags = 0;
   VK_CHECK_RESULT(vkCreateFence(m_device, &fenceCreateInfo, NULL, &m_fence));
 
+  auto t1 = high_resolution_clock::now();
+
   // Отправляем буфер команд на выполнение
   VK_CHECK_RESULT(vkQueueSubmit(m_computeQueue, 1, &submitInfo, m_fence));
 
   //Ждём конца выполнения команд
   VK_CHECK_RESULT(vkWaitForFences(m_device, 1, &m_fence, VK_TRUE, 100000000000));
 
+  auto t2 = high_resolution_clock::now();
+
   std::vector<float> values(m_length);
-  m_pCopyHelper->ReadBuffer(m_sum, 0, values.data(), sizeof(float) * values.size());
-  for (auto v: values) {
-    std::cout << v << ' ';
-  }
+  m_pCopyHelper->ReadBuffer(m_res, 0, values.data(), sizeof(float) * values.size());
+
+  auto t3 = high_resolution_clock::now();
+
+  duration<double, std::milli> ms_time_buffer = t3 - t1;
+  duration<double, std::milli> ms_time_nobuffer = t2 - t1;
+
+  float mean = std::reduce(values.begin(), values.end()) / values.size();
+  std::cout << "\n\nGPU TEST:\n";
+  std::cout << "Mean: " << std::setprecision(8) << std::fixed << mean << std::endl;
+  std::cout << "Time processing shader: " << std::setprecision(2) << ms_time_nobuffer.count() << "ms\n";
+  std::cout << "Time with reading buffer: " << ms_time_buffer.count() << "ms\n";
 }

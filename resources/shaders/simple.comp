@@ -11,20 +11,26 @@ layout(std430, binding = 0) buffer a
     float A[];
 };
 
-layout(std430, binding = 1) buffer b
+layout(std430, binding = 1) buffer Res
 {
-    float B[];
-};
-
-layout(std430, binding = 2) buffer Sum
-{
-    float sum[];
+    float res[];
 };
 
 void main() 
 {
     uint idx = gl_GlobalInvocationID.x;
+    
+
     if (idx < PushConstant.len) {
-        sum[idx] = A[idx] + B[idx];
+        int offset = 3;
+        float value = 0.;
+        for (int j = -offset; j <= offset; j++)
+        {
+          if (idx - offset >= 0 && idx + offset < PushConstant.len)
+          {
+              value += A[idx + j];
+          }
+        }
+        res[idx] = A[idx] - value / 7.0;
     }
 }
