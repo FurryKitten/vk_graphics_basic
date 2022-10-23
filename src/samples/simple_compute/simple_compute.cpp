@@ -115,7 +115,7 @@ void SimpleCompute::BuildCommandBufferSimple(VkCommandBuffer a_cmdBuff, VkPipeli
 
   vkCmdPushConstants(a_cmdBuff, m_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(m_length), &m_length);
 
-  vkCmdDispatch(a_cmdBuff, m_length / 32, 1, 1);
+  vkCmdDispatch(a_cmdBuff, m_length / 32 + 1, 1, 1);
 
   VK_CHECK_RESULT(vkEndCommandBuffer(a_cmdBuff));
 }
@@ -230,6 +230,6 @@ void SimpleCompute::Execute()
   float mean = std::reduce(values.begin(), values.end()) / values.size();
   std::cout << "\n\nGPU TEST:\n";
   std::cout << "Mean: " << std::setprecision(8) << std::fixed << mean << std::endl;
-  std::cout << "Time processing shader: " << std::setprecision(2) << ms_time_nobuffer.count() << "ms\n";
+  std::cout << "Time processing shader: " << std::setprecision(5) << ms_time_nobuffer.count() << "ms\n";
   std::cout << "Time with reading buffer: " << ms_time_buffer.count() << "ms\n";
 }

@@ -26,7 +26,7 @@ void main()
         float value = 0.;
         for (int j = -offset; j <= offset; j++)
         {
-          if (idx - offset >= 0 && idx + offset < PushConstant.len)
+          if (idx + j >= 0 && idx + j < PushConstant.len)
           {
               value += A[idx + j];
           }

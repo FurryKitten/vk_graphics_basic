@@ -34,7 +34,7 @@ void testCPU()
     float value = 0.0;
     for (int j = -offset; j <= offset; ++j)
     {
-      if (i - offset >= 0 && i + offset < LENGTH)
+      if (i + j >= 0 && i + j < LENGTH)
       {
         value += numbers[i + j];
       }
@@ -48,7 +48,7 @@ void testCPU()
 
   std::cout << "\n\nCPU TEST:\n";
   std::cout << "Mean: " << std::setprecision(8) << mean << std::endl;
-  std::cout << "Time: " << std::setprecision(2) << ms_time.count() << "ms\n";
+  std::cout << "Time: " << std::setprecision(5) << ms_time.count() << "ms\n";
 }
 
 int main()
