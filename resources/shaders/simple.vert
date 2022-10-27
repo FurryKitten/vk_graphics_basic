@@ -51,9 +51,12 @@ void main(void)
     {
     case 1:
     {
-        vec3 newPos = vec3(vPosNorm.x, vPosNorm.y + sin(Params.time) * 0.2 + 0.2, vPosNorm.z) * rotY(Params.time);
+        vec3 newPos = vec3(
+            vPosNorm.x + sin(vPosNorm.y * 10 + Params.time * 4) * 0.01, 
+            vPosNorm.y + sin(vPosNorm.z * 10 + Params.time * 4) * 0.03 + 0.2, 
+            vPosNorm.z
+        ) * rotY(Params.time);
         vOut.wPos = (params.mModel * vec4(newPos, 1.0f)).xyz;
-//        vOut.wPos.x += sin(Params.time);
         break;
     }
     case 3:
