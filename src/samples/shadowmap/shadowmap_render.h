@@ -14,10 +14,12 @@
 
 #include <string>
 #include <iostream>
+#include <random>
 
 #include <etna/GlobalContext.hpp>
 #include <etna/Sampler.hpp>
 
+const static char* FRUSTUM_CULLING_PROGRAM = "compute_frustum";
 
 class SimpleShadowmapRender : public IRender
 {
@@ -48,6 +50,11 @@ private:
   etna::Sampler defaultSampler;
   etna::Buffer constants;
 
+  //etna::Buffer instanceCount;
+  etna::Buffer instanceInfoBuffer;
+  etna::Buffer positionsBuffer;
+  etna::Buffer visibleIndicesBuffer;
+
   VkCommandPool    m_commandPool    = VK_NULL_HANDLE;
 
   struct
@@ -73,6 +80,14 @@ private:
   UniformParams m_uniforms {};
   void* m_uboMappedMem = nullptr;
 
+  void* m_instanceCountMem = nullptr;
+  void* m_instancePositionsMem = nullptr;
+  void* m_visibleIndicesMem = nullptr;
+  void* m_instanceInfoMem = nullptr;
+
+  uint32_t m_maxInstances = 10000;
+
+  etna::ComputePipeline m_frustumCullingPipeline {};
   etna::GraphicsPipeline m_basicForwardPipeline {};
   etna::GraphicsPipeline m_shadowPipeline {};
 
@@ -96,6 +111,8 @@ private:
   std::shared_ptr<vk_utils::IQuad>               m_pFSQuad;
   VkDescriptorSet       m_quadDS; 
   VkDescriptorSetLayout m_quadDSLayout = nullptr;
+  VkDescriptorSet m_frustumDS;
+  VkDescriptorSetLayout m_frustumDSLayout = nullptr;
 
   struct InputControlMouseEtc
   {
@@ -152,7 +169,9 @@ private:
 
   void InitPresentStuff();
   void ResetPresentStuff();
+
+  void FillPositionsBuffer();
 };
 
 
-#endif //CHIMERA_SIMPLE_RENDER_H
+#endif //SIMPLE_SHADOWMAP_RENDER_H
