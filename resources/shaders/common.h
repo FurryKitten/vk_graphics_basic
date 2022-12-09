@@ -51,22 +51,10 @@ struct UniformParams
   shader_bool  animateLightColor;
 };
 
-struct BoundingBox
-{
-  float4 bboxMin;
-  float4 bboxMax;
-};
-
-struct InstancingData
-{
-  uint32_t instanceCount{10000};
-  BoundingBox bbox;
-};
-
 struct VisibleIndices
 {
-  uint32_t indicesCount;
-  uint32_t indices[10000];
+  shader_uint indicesCount;
+  shader_uint indices[10000];
 };
 
 #endif // VK_GRAPHICS_BASIC_COMMON_H

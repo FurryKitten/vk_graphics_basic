@@ -50,10 +50,9 @@ private:
   etna::Sampler defaultSampler;
   etna::Buffer constants;
 
-  //etna::Buffer instanceCount;
-  etna::Buffer instanceInfoBuffer;
   etna::Buffer positionsBuffer;
   etna::Buffer visibleIndicesBuffer;
+  etna::Buffer indirectInfoBuffer;
 
   VkCommandPool    m_commandPool    = VK_NULL_HANDLE;
 
@@ -74,16 +73,23 @@ private:
     float4x4 model;
   } pushConst2M;
 
+  struct
+  {
+    float4x4 projView;
+    float4 bboxMin;
+    float4 bboxMax;
+    uint32_t instanceCount;
+  } pushConstFrustum;
+
   float4x4 m_worldViewProj;
   float4x4 m_lightMatrix;    
 
   UniformParams m_uniforms {};
   void* m_uboMappedMem = nullptr;
 
-  void* m_instanceCountMem = nullptr;
   void* m_instancePositionsMem = nullptr;
   void* m_visibleIndicesMem = nullptr;
-  void* m_instanceInfoMem = nullptr;
+  void* m_indirectInfoMem = nullptr;
 
   uint32_t m_maxInstances = 10000;
 
