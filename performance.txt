@@ -1,0 +1,3 @@
+Производительность без изменений: 5   fps
++ Instanced Rendering:            8   fps
++ Frustum Culling:                107 fps

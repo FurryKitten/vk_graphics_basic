@@ -87,22 +87,48 @@ private:
   {
     float4x4 projView;
     float4x4 model;
+    uint objType;
   } pushConst2M;
 
+  struct
+  {
+    float4x4 projView;
+    float4 position;
+    float4 bboxMin;
+    float4 bboxMax;
+    uint32_t instanceCount;
+  } pushConstFrustum;
+
+  struct VisibleIndices
+  {
+    uint32_t indicesCount;
+    uint32_t indices[10000];
+  };
+
   float4x4 m_worldViewProj;
-  float4x4 m_lightMatrix;    
+  float4x4 m_lightMatrix;
+
+  uint32_t m_maxInstanceCount = 10000;
 
   UniformParams m_uniforms {};
   VkBuffer m_ubo = VK_NULL_HANDLE;
   VkDeviceMemory m_uboAlloc = VK_NULL_HANDLE;
   void* m_uboMappedMem = nullptr;
 
+  VkBuffer m_visibleIndicesBuffer = VK_NULL_HANDLE;
+  VkDeviceMemory m_visibleIndicesBufferAlloc = VK_NULL_HANDLE;
+  void* m_visibleIndicesBufferMappedMem = nullptr;
+
+  pipeline_data_t m_frustumPipeline {};
   pipeline_data_t m_basicForwardPipeline {};
   pipeline_data_t m_shadowPipeline {};
 
   VkDescriptorSet m_dSet = VK_NULL_HANDLE;
   VkDescriptorSetLayout m_dSetLayout = VK_NULL_HANDLE;
   VkRenderPass m_screenRenderPass = VK_NULL_HANDLE; // main renderpass
+
+  VkDescriptorSet m_frustumDSet = VK_NULL_HANDLE;
+  VkDescriptorSetLayout m_frustumDSetLayout = VK_NULL_HANDLE;
 
   std::shared_ptr<vk_utils::DescriptorMaker> m_pBindings = nullptr;
 
@@ -181,6 +207,8 @@ private:
 
   void CreateUniformBuffer();
   void UpdateUniformBuffer(float a_time);
+  void CreateFrustumBuffer();
+  void UpdateFrustumBuffer(float4 position, float4 bboxMin, float4 bboxMax);
 
   void Cleanup();
 
