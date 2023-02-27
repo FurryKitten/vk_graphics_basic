@@ -72,6 +72,10 @@ private:
   float4x4 m_worldViewProj;
   float4x4 m_lightMatrix;    
 
+  
+  float spotlightInnerAngle = 20.0f;
+  float spotlightCutoffAngle = 25.0f;
+
   UniformParams m_uniforms {};
   void* m_uboMappedMem = nullptr;
 
@@ -111,7 +115,7 @@ private:
   struct ShadowMapCam
   {
     ShadowMapCam() 
-    {  
+    {
       cam.pos    = float3(4.0f, 4.0f, 4.0f);
       cam.lookAt = float3(0, 0, 0);
       cam.up     = float3(0, 1, 0);

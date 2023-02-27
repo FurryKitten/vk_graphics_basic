@@ -41,9 +41,12 @@ void SimpleShadowmapRender::UpdateView()
 
 void SimpleShadowmapRender::UpdateUniformBuffer(float a_time)
 {
-  m_uniforms.lightMatrix = m_lightMatrix;
-  m_uniforms.lightPos    = m_light.cam.pos; //LiteMath::float3(sinf(a_time), 1.0f, cosf(a_time));
-  m_uniforms.time        = a_time;
+  m_uniforms.lightMatrix          = m_lightMatrix;
+  m_uniforms.lightPos             = m_light.cam.pos;
+  m_uniforms.spotlightDirection   = m_light.cam.forward();
+  m_uniforms.spotlightInnerAngle  = cosf(spotlightInnerAngle  * LiteMath::DEG_TO_RAD);
+  m_uniforms.spotlightCutoffAngle = cosf(spotlightCutoffAngle * LiteMath::DEG_TO_RAD);
+  m_uniforms.time                 = a_time;
 
   memcpy(m_uboMappedMem, &m_uniforms, sizeof(m_uniforms));
 }
