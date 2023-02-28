@@ -16,6 +16,8 @@ void SimpleShadowmapRender::SetupGUIElements()
     
     ImGui::SliderFloat("Spotlight inner angle", &spotlightInnerAngle, 1.f, 40.f);
     ImGui::SliderFloat("Spotlight cutoff angle", &spotlightCutoffAngle, 1.f, 40.f);
+    spotlightInnerAngle  = clamp(spotlightInnerAngle, 1.f, spotlightCutoffAngle);
+    spotlightCutoffAngle = clamp(spotlightCutoffAngle, spotlightInnerAngle, 40.f);
 
     ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
