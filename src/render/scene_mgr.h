@@ -26,6 +26,7 @@ struct SceneManager
   ~SceneManager() { DestroyScene(); }
 
   bool LoadSceneXML(const std::string &scenePath, bool transpose = true);
+  bool LoadTesselatedQuad(const std::string &scenePath, bool transpose, int resolution, float size);
   void LoadSingleTriangle();
 
   uint32_t AddMeshFromFile(const std::string& meshPath);

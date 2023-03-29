@@ -67,6 +67,9 @@ private:
   {
     float4x4 projView;
     float4x4 model;
+    shader_uint resolution = 1024u;
+    shader_float minHeight = 0.0f;
+    shader_float maxHeight = 5.0f;
   } pushConst2M;
 
   float4x4 m_worldViewProj;

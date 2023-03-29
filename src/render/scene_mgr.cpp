@@ -67,6 +67,38 @@ bool SceneManager::LoadSceneXML(const std::string &scenePath, bool transpose)
   return true;
 }
 
+bool SceneManager::LoadTesselatedQuad(const std::string &scenePath, bool transpose, int resolution, float size)
+{
+  auto hscene_main = std::make_shared<hydra_xml::HydraScene>();
+  auto res         = hscene_main->LoadState(scenePath);
+
+  if(res < 0)
+  {
+    RUN_TIME_ERROR("LoadSceneXML error");
+    return false;
+  }
+
+  for(auto cam : hscene_main->Cameras())
+  {
+    m_sceneCameras.push_back(cam);
+  }
+
+  cmesh::SimpleMesh mesh = cmesh::CreateQuad(resolution, resolution, size);
+
+  AddMeshFromData(mesh);
+
+  float3 position = float3(10.0f, 0.f, -20.0f);
+  float4x4 rotation = LiteMath::rotate4x4X(-90.0f);
+  float scale = 25.0f;
+  float4x4 tm = LiteMath::translate4x4(position) * rotation * LiteMath::scale4x4(float3(scale));
+  m_instanceMatrices.push_back(tm);
+
+  LoadGeoDataOnGPU();
+  hscene_main = nullptr;
+
+  return true;
+}
+
 hydra_xml::Camera SceneManager::GetCamera(uint32_t camId) const
 {
   if(camId >= m_sceneCameras.size())
@@ -305,4 +337,51 @@ etna::VertexByteStreamFormatDescription SceneManager::GetVertexStreamDescription
 
   return result;
 }
+
+/*
+cmesh::SimpleMesh SceneManager::CreateTesselatedQuad(int resolution)
+{
+  cmesh::SimpleMesh res(vertNum, quadsNum*2*3);
+
+  const float edgeLength  = a_size / float(a_sizeX);
+  //  const float edgeLength2 = sqrtf(2.0f)*edgeLength;
+
+  // put vertices
+  //
+  const float startX = -0.5f*a_size;
+  const float startY = -0.5f*a_size;
+
+  float* vPos4f_f = res.vPos4f.data();
+  float* vNorm4f  = res.vNorm4f.data();
+
+  for (uint32_t y = 0; y < vertNumY; y++)
+  {
+    const float ypos = startY + float(y)*edgeLength;
+    const uint32_t offset = y*vertNumX;
+
+    for (uint32_t x = 0; x < vertNumX; x++)
+    {
+      const float xpos = startX + float(x)*edgeLength;
+      const uint32_t i = offset + x;
+
+      vPos4f_f[i * 4 + 0] = xpos;
+      vPos4f_f[i * 4 + 1] = ypos;
+      vPos4f_f[i * 4 + 2] = 0.0f;
+      vPos4f_f[i * 4 + 3] = 1.0f;
+
+      vNorm4f[i * 4 + 0] = 0.0f;
+      vNorm4f[i * 4 + 1] = 0.0f;
+      vNorm4f[i * 4 + 2] = 1.0f;
+      vNorm4f[i * 4 + 3] = 0.0f;
+
+      res.vTexCoord2f[i * 2 + 0] = (xpos - startX) / a_size;
+      res.vTexCoord2f[i * 2 + 1] = (ypos - startY) / a_size;
+    }
+  }
+
+  res.indices = CreateQuadTriIndices(a_sizeX, a_sizeY);
+
+  return res;
+}
+*/
 

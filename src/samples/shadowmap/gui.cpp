@@ -18,6 +18,11 @@ void SimpleShadowmapRender::SetupGUIElements()
 
     ImGui::NewLine();
 
+    ImGui::SliderFloat("Min height", &pushConst2M.minHeight, 0.f, 10.f);
+    ImGui::SliderFloat("Max height", &pushConst2M.maxHeight, 0.f, 10.f);
+
+    ImGui::NewLine();
+
     ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f),"Press 'B' to recompile and reload shaders");
     ImGui::End();
   }

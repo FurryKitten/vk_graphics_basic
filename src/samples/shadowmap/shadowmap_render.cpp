@@ -45,7 +45,8 @@ void SimpleShadowmapRender::AllocateResources()
 
 void SimpleShadowmapRender::LoadScene(const char* path, bool transpose_inst_matrices)
 {
-  m_pScnMgr->LoadSceneXML(path, transpose_inst_matrices);
+  //m_pScnMgr->LoadSceneXML(path, transpose_inst_matrices);
+  m_pScnMgr->LoadTesselatedQuad(path, transpose_inst_matrices, 1024, 1.0f);
 
   // TODO: Make a separate stage
   loadShaders();
@@ -53,7 +54,7 @@ void SimpleShadowmapRender::LoadScene(const char* path, bool transpose_inst_matr
 
   auto loadedCam = m_pScnMgr->GetCamera(0);
   m_cam.fov = loadedCam.fov;
-  m_cam.pos = float3(loadedCam.pos);
+  m_cam.pos = float3(4.0f, 10.0f, 4.0f);//float3(loadedCam.pos);
   m_cam.up  = float3(loadedCam.up);
   m_cam.lookAt = float3(loadedCam.lookAt);
   m_cam.tdist  = loadedCam.farPlane;
@@ -163,16 +164,13 @@ void SimpleShadowmapRender::DrawSceneCmd(VkCommandBuffer a_cmdBuff, const float4
   vkCmdBindIndexBuffer(a_cmdBuff, indexBuf, 0, VK_INDEX_TYPE_UINT32);
 
   pushConst2M.projView = a_wvp;
-  for (uint32_t i = 0; i < m_pScnMgr->InstancesNum(); ++i)
-  {
-    auto inst         = m_pScnMgr->GetInstanceInfo(i);
-    pushConst2M.model = m_pScnMgr->GetInstanceMatrix(i);
-    vkCmdPushConstants(a_cmdBuff, m_basicForwardPipeline.getVkPipelineLayout(),
-      stageFlags, 0, sizeof(pushConst2M), &pushConst2M);
 
-    auto mesh_info = m_pScnMgr->GetMeshInfo(inst.mesh_id);
-    vkCmdDrawIndexed(a_cmdBuff, mesh_info.m_indNum, 1, mesh_info.m_indexOffset, mesh_info.m_vertexOffset, 0);
-  }
+  pushConst2M.model = m_pScnMgr->GetInstanceMatrix(0);
+  vkCmdPushConstants(a_cmdBuff, m_basicForwardPipeline.getVkPipelineLayout(),
+    stageFlags, 0, sizeof(pushConst2M), &pushConst2M);
+
+  auto mesh_info = m_pScnMgr->GetMeshInfo(0);
+  vkCmdDrawIndexed(a_cmdBuff, mesh_info.m_indNum, 1, mesh_info.m_indexOffset, mesh_info.m_vertexOffset, 0);
 }
 
 void SimpleShadowmapRender::BuildCommandBufferSimple(VkCommandBuffer a_cmdBuff, VkImage a_targetImage, VkImageView a_targetImageView)
