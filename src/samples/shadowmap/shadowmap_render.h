@@ -47,8 +47,12 @@ private:
   etna::GlobalContext* m_context;
   etna::Image mainViewDepth;
   etna::Image shadowMap;
+  etna::Image postProcess;
   etna::Sampler defaultSampler;
+  etna::Sampler linearSampler;
   etna::Buffer constants;
+  etna::Buffer noiseInfoBuffer;
+  etna::Buffer boxIndexBuffer;
 
   VkCommandPool    m_commandPool    = VK_NULL_HANDLE;
 
@@ -77,9 +81,12 @@ private:
 
   UniformParams m_uniforms {};
   void* m_uboMappedMem = nullptr;
+  void* m_noiseInfoMem = nullptr;
 
   etna::GraphicsPipeline m_basicForwardPipeline {};
   etna::GraphicsPipeline m_shadowPipeline {};
+  etna::GraphicsPipeline m_fogPipeline {};
+  etna::GraphicsPipeline m_postProcessPipeline {};
 
   std::shared_ptr<vk_utils::DescriptorMaker> m_pBindings = nullptr;
   
@@ -130,6 +137,17 @@ private:
     bool   usePerspectiveM;  ///!< use perspective matrix if true and ortographics otherwise
   
   } m_light;
+
+  const std::array<uint16_t, 36> boxIndices = {
+    0, 3, 1, 0, 2, 3, 0, 1, 5, 0, 5, 4, 0, 4, 6, 0, 6, 2, 1, 7, 5, 1, 3, 7, 4, 5, 7, 4, 7, 6, 2, 7, 3, 2, 6, 7
+  };
+
+  Noise m_noiseInfo{
+    .scale = {1.6f, 2.1f, 1.5f},
+    .extinction = 0.2f,
+    .transformPos = {10.0f, 5.2f, -20.95f},
+    .transformScale = {9.85f, 4.92f, 9.58f},
+  };
  
   void DrawFrameSimple(bool draw_gui);
 
@@ -139,6 +157,7 @@ private:
   void BuildCommandBufferSimple(VkCommandBuffer a_cmdBuff, VkImage a_targetImage, VkImageView a_targetImageView);
 
   void DrawSceneCmd(VkCommandBuffer a_cmdBuff, const float4x4& a_wvp);
+  void DrawBoxCmd(VkCommandBuffer a_cmdBuff, const float4x4& a_wvp);
 
   void loadShaders();
 

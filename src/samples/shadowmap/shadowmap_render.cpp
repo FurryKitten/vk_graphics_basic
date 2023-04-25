@@ -31,7 +31,16 @@ void SimpleShadowmapRender::AllocateResources()
     .imageUsage = vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled
   });
 
+  postProcess = m_context->createImage(etna::Image::CreateInfo{
+    .extent = vk::Extent3D{m_width / 4, m_height / 4, 1},
+    .name = "fog",
+    .format = vk::Format::eR8G8B8A8Unorm,
+    .imageUsage = vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled
+  });
+
   defaultSampler = etna::Sampler(etna::Sampler::CreateInfo{.name = "default_sampler"});
+  linearSampler = etna::Sampler(etna::Sampler::CreateInfo{.filter = vk::Filter::eLinear, .name = "linear_sampler"});
+
   constants = m_context->createBuffer(etna::Buffer::CreateInfo
   {
     .size = sizeof(UniformParams),
@@ -40,7 +49,23 @@ void SimpleShadowmapRender::AllocateResources()
     .name = "constants"
   });
 
+  noiseInfoBuffer = m_context->createBuffer(etna::Buffer::CreateInfo
+  {
+    .size = sizeof(Noise),
+    .bufferUsage = vk::BufferUsageFlagBits::eUniformBuffer,
+    .memoryUsage = VMA_MEMORY_USAGE_CPU_ONLY,
+    .name = "noise_info"
+  });
+  boxIndexBuffer = m_context->createBuffer(etna::Buffer::CreateInfo
+  {
+    .size = sizeof(uint16_t) * 36,
+    .bufferUsage = vk::BufferUsageFlagBits::eIndexBuffer,
+    .memoryUsage = VMA_MEMORY_USAGE_CPU_TO_GPU,
+    .name = "box_indices"
+  });
+
   m_uboMappedMem = constants.map();
+  m_noiseInfoMem = noiseInfoBuffer.map();
 }
 
 void SimpleShadowmapRender::LoadScene(const char* path, bool transpose_inst_matrices)
@@ -54,20 +79,26 @@ void SimpleShadowmapRender::LoadScene(const char* path, bool transpose_inst_matr
 
   auto loadedCam = m_pScnMgr->GetCamera(0);
   m_cam.fov = loadedCam.fov;
-  m_cam.pos = float3(4.0f, 10.0f, 4.0f);//float3(loadedCam.pos);
+  m_cam.pos = float3(30.0f, 12.0f, 0.0f);
   m_cam.up  = float3(loadedCam.up);
   m_cam.lookAt = float3(loadedCam.lookAt);
   m_cam.tdist  = loadedCam.farPlane;
+
+  auto mapped_mem = boxIndexBuffer.map();
+  memcpy(mapped_mem, boxIndices.data(), sizeof(uint16_t) * boxIndices.size());
+  boxIndexBuffer.unmap();
 }
 
 void SimpleShadowmapRender::DeallocateResources()
 {
   mainViewDepth.reset(); // TODO: Make an etna method to reset all the resources
   shadowMap.reset();
+  postProcess.reset();
   m_swapchain.Cleanup();
   vkDestroySurfaceKHR(GetVkInstance(), m_surface, nullptr);  
 
   constants = etna::Buffer();
+  noiseInfoBuffer = etna::Buffer();
 }
 
 
@@ -100,6 +131,8 @@ void SimpleShadowmapRender::loadShaders()
   etna::create_program("simple_material",
     {VK_GRAPHICS_BASIC_ROOT"/resources/shaders/simple_shadow.frag.spv", VK_GRAPHICS_BASIC_ROOT"/resources/shaders/simple.vert.spv"});
   etna::create_program("simple_shadow", {VK_GRAPHICS_BASIC_ROOT"/resources/shaders/simple.vert.spv"});
+  etna::create_program("fog_pipeline", {VK_GRAPHICS_BASIC_ROOT"/resources/shaders/fog.vert.spv", VK_GRAPHICS_BASIC_ROOT"/resources/shaders/fog.frag.spv"});
+  etna::create_program("post_process_pipeline", {VK_GRAPHICS_BASIC_ROOT"/resources/shaders/quad3_vert.vert.spv", VK_GRAPHICS_BASIC_ROOT"/resources/shaders/quad.frag.spv"});
 }
 
 void SimpleShadowmapRender::SetupSimplePipeline()
@@ -112,7 +145,8 @@ void SimpleShadowmapRender::SetupSimplePipeline()
   m_pBindings = std::make_shared<vk_utils::DescriptorMaker>(m_context->getDevice(), dtypes, 2);
   
   m_pBindings->BindBegin(VK_SHADER_STAGE_FRAGMENT_BIT);
-  m_pBindings->BindImage(0, shadowMap.getView({}), defaultSampler.get(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+  //m_pBindings->BindImage(0, shadowMap.getView({}), defaultSampler.get(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+  m_pBindings->BindImage(0, postProcess.getView({}), defaultSampler.get(), VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
   m_pBindings->BindEnd(&m_quadDS, &m_quadDSLayout);
 
   etna::VertexShaderInputDescription sceneVertexInputDesc
@@ -139,6 +173,46 @@ void SimpleShadowmapRender::SetupSimplePipeline()
       .fragmentShaderOutput =
         {
           .depthAttachmentFormat = vk::Format::eD16Unorm
+        }
+    });
+  m_fogPipeline = pipelineManager.createGraphicsPipeline("fog_pipeline",
+    {
+      .rasterizationConfig =
+        {
+          .cullMode = vk::CullModeFlagBits::eFront,
+          .frontFace = vk::FrontFace::eClockwise,
+          .lineWidth = 1.0
+        },
+      .fragmentShaderOutput =
+        {
+          .colorAttachmentFormats = {vk::Format::eR8G8B8A8Unorm},
+        }
+    });
+
+
+  vk::PipelineColorBlendAttachmentState colorBlendAttachmentState
+    {
+      .blendEnable = true,
+      .srcColorBlendFactor = vk::BlendFactor::eSrcAlpha,
+      .dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha,
+      .colorBlendOp = vk::BlendOp::eAdd,
+      .srcAlphaBlendFactor = vk::BlendFactor::eOne,
+      .dstAlphaBlendFactor = vk::BlendFactor::eZero,
+      .alphaBlendOp = vk::BlendOp::eAdd,
+      .colorWriteMask = vk::ColorComponentFlagBits::eR
+                      | vk::ColorComponentFlagBits::eG
+                      | vk::ColorComponentFlagBits::eB
+                      | vk::ColorComponentFlagBits::eA,
+    };
+  m_postProcessPipeline = pipelineManager.createGraphicsPipeline("post_process_pipeline",
+    {
+      .blendingConfig =
+        {
+          .attachments = {colorBlendAttachmentState}
+        },
+      .fragmentShaderOutput =
+        {
+          .colorAttachmentFormats = {static_cast<vk::Format>(m_swapchain.GetFormat())},
         }
     });
 }
@@ -171,6 +245,20 @@ void SimpleShadowmapRender::DrawSceneCmd(VkCommandBuffer a_cmdBuff, const float4
 
   auto mesh_info = m_pScnMgr->GetMeshInfo(0);
   vkCmdDrawIndexed(a_cmdBuff, mesh_info.m_indNum, 1, mesh_info.m_indexOffset, mesh_info.m_vertexOffset, 0);
+}
+
+void SimpleShadowmapRender::DrawBoxCmd(VkCommandBuffer a_cmdBuff, const LiteMath::float4x4 &a_wvp)
+{
+  VkShaderStageFlags stageFlags = (VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+
+  vkCmdBindIndexBuffer(a_cmdBuff, boxIndexBuffer.get(), 0, VK_INDEX_TYPE_UINT16);
+
+  pushConst2M.projView = a_wvp;
+
+  vkCmdPushConstants(a_cmdBuff, m_fogPipeline.getVkPipelineLayout(),
+    stageFlags, 0, sizeof(pushConst2M), &pushConst2M);
+
+  vkCmdDrawIndexed(a_cmdBuff, boxIndices.size(), 1, 0, 0, 0);
 }
 
 void SimpleShadowmapRender::BuildCommandBufferSimple(VkCommandBuffer a_cmdBuff, VkImage a_targetImage, VkImageView a_targetImageView)
@@ -212,6 +300,56 @@ void SimpleShadowmapRender::BuildCommandBufferSimple(VkCommandBuffer a_cmdBuff, 
       m_basicForwardPipeline.getVkPipelineLayout(), 0, 1, &vkSet, 0, VK_NULL_HANDLE);
 
     DrawSceneCmd(a_cmdBuff, m_worldViewProj);
+  }
+
+  {
+    auto simpleFogInfo = etna::get_shader_program("fog_pipeline");
+
+    auto set = etna::create_descriptor_set(simpleFogInfo.getDescriptorLayoutId(0), a_cmdBuff,
+      {
+        etna::Binding {0, constants.genBinding()},
+        etna::Binding {1, noiseInfoBuffer.genBinding()}
+      });
+
+    VkDescriptorSet vkSet = set.getVkSet();
+
+    etna::RenderTargetState::AttachmentParams colorAttachmentParams{postProcess};
+    colorAttachmentParams.clearColorValue = std::array<float, 4>{0.0f, 0.0f, 0.0f, 0.0f};
+    colorAttachmentParams.loadOp = vk::AttachmentLoadOp::eClear;
+    colorAttachmentParams.storeOp = vk::AttachmentStoreOp::eStore;
+    etna::RenderTargetState renderTargets(a_cmdBuff, {m_width / 4, m_height / 4}, {colorAttachmentParams}, {});
+
+    vkCmdBindPipeline(a_cmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, m_fogPipeline.getVkPipeline());
+    vkCmdBindDescriptorSets(a_cmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, m_fogPipeline.getVkPipelineLayout(), 0, 1, &vkSet, 0, VK_NULL_HANDLE);
+
+    DrawBoxCmd(a_cmdBuff, m_worldViewProj);
+  }
+
+  etna::set_state(a_cmdBuff, postProcess.get(), vk::PipelineStageFlagBits2::eFragmentShader,
+    vk::AccessFlagBits2::eShaderRead, vk::ImageLayout::eShaderReadOnlyOptimal,
+    vk::ImageAspectFlagBits::eColor);
+  etna::flush_barriers(a_cmdBuff);
+
+  {
+    auto postProcessInfo = etna::get_shader_program("post_process_pipeline");
+
+    auto set = etna::create_descriptor_set(postProcessInfo.getDescriptorLayoutId(0), a_cmdBuff,
+      {
+        etna::Binding {0, postProcess.genBinding(linearSampler.get(), vk::ImageLayout::eShaderReadOnlyOptimal)}
+      });
+
+    VkDescriptorSet vkSet = set.getVkSet();
+
+    etna::RenderTargetState::AttachmentParams colorAttachmentParams{a_targetImage, a_targetImageView};
+//    colorAttachmentParams.clearColorValue = std::array<float, 4>{0.0f,0.0f,0.0f,0.0f};
+    colorAttachmentParams.loadOp = vk::AttachmentLoadOp::eDontCare;
+    colorAttachmentParams.storeOp = vk::AttachmentStoreOp::eStore;
+    etna::RenderTargetState renderTargets(a_cmdBuff, {m_width, m_height}, {colorAttachmentParams}, {});
+
+    vkCmdBindPipeline(a_cmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, m_postProcessPipeline.getVkPipeline());
+    vkCmdBindDescriptorSets(a_cmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, m_postProcessPipeline.getVkPipelineLayout(), 0, 1, &vkSet, 0, VK_NULL_HANDLE);
+
+    vkCmdDraw(a_cmdBuff, 3, 1, 0, 0);
   }
 
   if(m_input.drawFSQuad)

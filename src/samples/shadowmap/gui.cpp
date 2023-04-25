@@ -23,6 +23,13 @@ void SimpleShadowmapRender::SetupGUIElements()
 
     ImGui::NewLine();
 
+    ImGui::SliderFloat("Extinction", &m_noiseInfo.extinction, 0.f, 5.f);
+    ImGui::SliderFloat3("Noise scale", m_noiseInfo.scale.M, 0.f, 10.f);
+    ImGui::SliderFloat3("Fog position", m_noiseInfo.transformPos.M, -30.f, 30.f);
+    ImGui::SliderFloat3("Fog scale", m_noiseInfo.transformScale.M, -10.f, 10.f);
+
+    ImGui::NewLine();
+
     ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f),"Press 'B' to recompile and reload shaders");
     ImGui::End();
   }
