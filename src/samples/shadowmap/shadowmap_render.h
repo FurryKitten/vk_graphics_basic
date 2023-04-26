@@ -47,7 +47,9 @@ private:
   etna::GlobalContext* m_context;
   etna::Image mainViewDepth;
   etna::Image shadowMap;
+  etna::Image ssaaImage;
   etna::Sampler defaultSampler;
+  etna::Sampler linearSampler;
   etna::Buffer constants;
 
   VkCommandPool    m_commandPool    = VK_NULL_HANDLE;
@@ -77,6 +79,7 @@ private:
 
   etna::GraphicsPipeline m_basicForwardPipeline {};
   etna::GraphicsPipeline m_shadowPipeline {};
+  etna::GraphicsPipeline m_ssaaPipeline {};
 
   std::shared_ptr<vk_utils::DescriptorMaker> m_pBindings = nullptr;
   
@@ -104,6 +107,15 @@ private:
   {
     bool drawFSQuad = false;
   } m_input;
+
+  enum AaMode
+  {
+    NONE,
+    SSAA,
+  } aaMode;
+  uint32_t m_ssaaResolution = 2;
+  bool m_ssaaEnabled = true;
+
 
   /**
   \brief basic parameters that you usually need for shadow mapping
@@ -144,6 +156,7 @@ private:
 
   void UpdateUniformBuffer(float a_time);
 
+  void ResetImages();
 
   void SetupDeviceExtensions();
 
